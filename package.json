@@ -1,0 +1,33 @@
+{
+  "name": "leveldb-logview",
+  "version": "1.0.0",
+  "description": "logview api for leveldb-log",
+  "main": "index.js",
+  "directories": {
+    "example": "examples"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kphongph/leveldb-logview.git"
+  },
+  "author": "Phongphun Kijsanayothin <kphongph@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/kphongph/leveldb-logview/issues"
+  },
+  "homepage": "https://github.com/kphongph/leveldb-logview#readme",
+  "devDependencies": {
+    "request": "^2.81.0"
+  },
+  "dependencies": {
+    "JSONStream": "^1.3.1",
+    "changeset": "^0.2.1",
+    "event-emitter": "^0.3.5",
+    "leveldown": "^1.6.0",
+    "levelup": "^1.3.5",
+    "through2": "^2.0.3"
+  }
+}
