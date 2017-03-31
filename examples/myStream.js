@@ -10,12 +10,14 @@ var teachdb = viewdb.sublevel('teach');
 var schoolTimeDb = viewdb.sublevel('schooltime');
 var studentDb = viewdb.sublevel('student');
 
+module.exports.db = viewdb;
+
 var azureConfig = {
   domain: "https://newtestnew.azurewebsites.net",
 };
 
 var get_course = function(obj) {
-  console.log('get_course');
+  //console.log('get_course');
   var attendance  = obj;
   return new Promise(function(fullfill,reject) {
     var key = bytewise.encode([
@@ -41,7 +43,7 @@ var get_course = function(obj) {
 };
 
 var find_schooltime = function(obj) {
-  console.log('find_schooltime');
+  //console.log('find_schooltime');
   var attendance  = obj.attendance;
   
   var get_level = function(attendance) {
@@ -68,7 +70,7 @@ var find_schooltime = function(obj) {
 }
 
 var get_schooltime = function(obj) {
-  console.log('get_schooltime',obj);
+  //console.log('get_schooltime',obj);
   var attendance = obj.attendance;
   var schoolTime = obj.schoolTime;
   return new Promise(function(fullfill,reject) {
@@ -115,7 +117,7 @@ var reverse = function() {
       self.push(chunk);
       cb();
     }).catch(function(err) {
-      console.log('re',chunk._rev,chunk.key,err);
+      //console.log('re',chunk._rev,chunk.key,err);
       self.push(chunk);
       cb();
     })
@@ -150,7 +152,7 @@ var forward = function() {
       self.push(chunk);
       cb();
      }).catch(function(err) {
-        console.log('fl',chunk._rev,chunk.key,err);
+        //console.log('fl',chunk._rev,chunk.key,err);
         self.push(chunk);
         cb();
      })
@@ -161,7 +163,7 @@ var forward = function() {
 });
 }
 
-module.exports = function(config) {
+module.exports.createStreamHandlers = function(config) {
   return function(next) {
     var myStream = function() {
       var stream = through2.obj(function(chunk,enc,cb) {
@@ -173,15 +175,37 @@ module.exports = function(config) {
 
     var endStream = function() {
       return through2.obj(function(chunk,enc,cb) {
-        if(chunk.student) {
-          console.log(chunk.student);
-        }
-        if(chunk._rev) {
-          console.log('end',chunk._rev);
+        var self = this;
+        if(chunk.attendance) {
+          var attendance = chunk.attendance;
+          var key = [attendance.hostid,
+            attendance.year,
+            attendance.semester,
+            chunk.student];
+          var change = {'present':chunk.present,
+            'absent':chunk.absent,'total':chunk.total};
+          var obj = {key:key,value:change};
+          viewdb.get(bytewise.encode(obj.key),function(err,_obj) { 
+            if(err) {
+              viewdb.put(bytewise.encode(obj.key),obj.value,function(err) { 
+                cb();
+              });
+            } else {
+              _obj.present+=obj.value.present;
+              _obj.absent+=obj.value.absent;
+              _obj.total+=obj.value.total;
+              //console.log(obj.key,_obj);
+              viewdb.put(bytewise.encode(obj.key),_obj,function(err) {
+                cb();
+              });
+            }
+          });
+        } else {
+          console.log(chunk._rev);
           this.push(chunk);
-          next();
+          cb();
+         // next();
         }
-        cb();
       });
     }
 

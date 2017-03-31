@@ -6,17 +6,17 @@ var http = require('http');
 var app = connect();
 var myStream = require('./myStream');
 
+var streamHandler = myStream.createStreamHandlers(config);
+
 logview.config({
   'url':'https://maas.nuqlis.com:9000/api/log/attendance',
   'jwtToken':config.token,
-  'streamHandler': myStream(config),
+  'mainDb':myStream.db,
+  'streamHandler': streamHandler,
 });
 
 app.use(logview.monitor);
-
-app.use(function(req,res) {
-  res.end('Hello for Connect!\n');
-});
+app.use(logview.serve);
 
 http.createServer(app).listen(3000);
 

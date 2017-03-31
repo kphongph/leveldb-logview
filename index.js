@@ -42,10 +42,9 @@ var _updateMirror = function(self,db,chunk,cb) {
 }
 
 var _request = function(config,_rev,next) {
-  var _rev = '1489443127144';
   var stream = request.get({
     url:config.url,
-    qs:{'gt':_rev,'limit':1},
+    qs:{'gt':_rev,'limit':100},
     headers: {
      'authorization':'JWT '+config.jwtToken
     }
@@ -63,7 +62,11 @@ var _request = function(config,_rev,next) {
   stream.pipe(through2.obj(function(chunk,enc,cb) {
     console.log('put',chunk._rev);
     config.configDb.put('_rev',{'ts':chunk._rev});
-  }));
+    cb();
+  })).on('finish',function() {
+    console.log('finish');
+    next();
+  });
 };
 
 logview.monitor = function(req,res,next) {
@@ -79,5 +82,16 @@ logview.monitor = function(req,res,next) {
       _request(config,value.ts,next);
     }
   });
-  
 }
+
+logview.serve = function(req,res,next) {
+  console.log('serve');
+  var db = logview.config.mainDb;
+  res.setHeader('content-type','application/json');
+  //res.end(JSON.stringify({'a':1}));
+  //console.log(db);
+  db.createReadStream()
+  .pipe(JSONStream.stringify())
+  .pipe(res);
+  //res.end(JSON.stringify({'a':1}));
+};
