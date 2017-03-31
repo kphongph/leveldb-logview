@@ -1,4 +1,4 @@
-# Logs
+:# Logs
 logs
 *.log
 npm-debug.log*
@@ -38,3 +38,5 @@ jspm_packages
 examples/config.js
 examples/test
 examples/view
+examples/_view
+

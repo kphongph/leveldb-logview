@@ -4,15 +4,12 @@ var config = require('./config');
 var logview = require('..');
 var http = require('http');
 var app = connect();
+var myStream = require('./myStream');
 
 logview.config({
   'url':'https://maas.nuqlis.com:9000/api/log/attendance',
   'jwtToken':config.token,
-  'streamHandler': function(chunk,enc,cb) {
-    console.log(chunk.key);
-    this.push(chunk);
-    cb();
-  }
+  'streamHandler': myStream(config),
 });
 
 app.use(logview.monitor);

@@ -13,9 +13,39 @@ logview.config = function(config) {
   var dbPath = config.dbPath?config.dbPath:'_view'; 
   logview.config.db = sublevel(levelup(dbPath,{'valueEncoding':'json'}));
   logview.config.configDb = logview.config.db.sublevel('_config'); 
+  logview.config.mirrorDb = logview.config.db.sublevel('_mirror'); 
+}
+
+var _updateMirror = function(self,db,chunk,cb) {
+  var value = diff.apply(chunk.value.changes,{});
+  db.get(chunk.value.key,function(err,obj) { 
+    if(!err) { 
+      var changes = diff(obj,value);
+      self.push({value:value,
+        _rev:chunk.key,
+        key:chunk.value.key,
+        _value:obj
+      });
+      cb();
+    } else {
+      var obj = {'key':chunk.value.key,'value':value};
+      db.put(obj.key,obj.value,function(err) {
+        if(!err) {
+          self.push({value:value,
+           _rev:chunk.key,
+           key:chunk.value.key});
+        }
+        cb();
+      });
+    }
+  });
 }
 
 var _request = function(config,_rev,next) {
+  var updateMirror = through2.obj(function(chunk,enc,cb) {
+    _updateMirror(this,config.mirrorDb,chunk,cb);
+  });
+
   request.get({
     url:config.url,
     qs:{'gt':_rev,'limit':1},
@@ -23,13 +53,20 @@ var _request = function(config,_rev,next) {
      'authorization':'JWT '+config.jwtToken
     }
   }).pipe(JSONStream.parse('*'))
-  .pipe(through2.obj(config.streamHandler,function(cb) {
-    next();
-    cb();
-  })).pipe(through2.obj(function(chunk,enc,cb) {
-    console.log('put',chunk.key);
-    config.configDb.put('_rev',{'ts':chunk.key});
-    cb();
+  .pipe(updateMirror);
+
+  var handlers = config.streamHandler(next);
+  console.log('handlers',handlers.length);
+  updateMirror.pipe(handlers[0]);
+
+  for(var i=0;i<handlers.length-1;i++) {
+    var next = handlers[i+1];
+    handlers[i].pipe(next);
+  }
+
+  handlers[handlers.length-1].pipe(through2.obj(function(chunk,enc,cb) {
+    console.log('put',chunk._rev);
+    config.configDb.put('_rev',{'ts':chunk._rev});
   }));
 };
 
@@ -43,7 +80,6 @@ logview.monitor = function(req,res,next) {
         _request(config,0,next);
       });
     } else {
-      console.log(value);
       _request(config,value.ts,next);
     }
   });
