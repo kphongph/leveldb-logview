@@ -6,6 +6,7 @@ var through2 = require('through2');
 var levelup = require('levelup');
 var sublevel = require('level-sublevel');
 var bytewise = require('bytewise');
+var _ = require('lodash');
 
 var stream = logview({
   db:{path:'./test'}
@@ -96,21 +97,16 @@ var reverse = through2.obj(function(chunk,enc,cb) {
   if(chunk._value) {
     get_course(chunk._value).then(find_schooltime).then(get_schooltime).then(function(obj) {
       var attendance = obj.attendance;
-      var students = obj.students.map(function(_obj) {
-        return _obj.cid;
-      });
+      var students = _.map(obj.students,'cid');
       attendance.data.forEach(function(slot) {
-        var absentList = slot.student.map(function(_obj) {
-          return _obj.cid;
-        });
-        var presentList = students.filter(function(cid) {
-          return absentList.indexOf(cid) < 0;
-        });
-        absentList.forEach(function(cid) {
+        var absentList = _.map(slot.student,'cid');
+        var presentList = _.difference(students,absentList);
+
+        _.forEach(absentList,function(cid) {
           self.push({'attendance':attendance,'student':cid,
             'present':0,'absent':-1,'total':-1});
         });
-        presentList.forEach(function(cid) {
+        _.forEach(presentList,function(cid) {
           self.push({'attendance':attendance,'student':cid,
             'present':-1,'absent':0,'total':-1});
         });
@@ -138,12 +134,8 @@ var follow = through2.obj(function(chunk,enc,cb) {
         return _obj.cid;
       });
       attendance.data.forEach(function(slot) {
-        var absentList = slot.student.map(function(_obj) {
-          return _obj.cid;
-        });
-        var presentList = students.filter(function(cid) {
-          return absentList.indexOf(cid) < 0;
-        });
+        var absentList = _.map(slot.student,'cid');
+        var presentList = _.difference(students,absentList);
         absentList.forEach(function(cid) {
           self.push({'attendance':attendance,'student':cid,
             'present':0,'absent':1,'total':1});
@@ -166,7 +158,7 @@ var follow = through2.obj(function(chunk,enc,cb) {
 
 request.get({
   url:'https://maas.nuqlis.com:9000/api/log/attendance',
-  qs:{'start':'14','limit':100},
+  qs:{'start':'14','limit':10},
   headers: {
     'authorization':'JWT '+config.token
   }})
