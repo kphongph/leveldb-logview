@@ -170,7 +170,7 @@ request.get({
   // console.log(chunk);
   var self = this;
   var attendance = chunk.attendance;
-  var key = [attendance.hostid,attendance.year,chunk.student];
+  var key = [attendance.hostid,attendance.year,attendance.semester,chunk.student];
   var change = {'present':chunk.present,'absent':chunk.absent,'total':chunk.total};
   var obj = {key:key,value:change};
   viewdb.get(bytewise.encode(obj.key),function(err,_obj) { 
