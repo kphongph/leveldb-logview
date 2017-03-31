@@ -8,7 +8,7 @@ var sublevel = require('level-sublevel');
 var bytewise = require('bytewise');
 var _ = require('lodash');
 
-var stream = logview({
+var stream = logview.initial({
   db:{path:'./test'}
 });
 
