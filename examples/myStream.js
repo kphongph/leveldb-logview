@@ -92,8 +92,8 @@ var get_schooltime = function(obj) {
 }
 
 
-var reverse = through2.obj(function(chunk,enc,cb) {
-  console.log('reverse',chunk);
+var reverse = function() {
+  return through2.obj(function(chunk,enc,cb) {
   var self = this;
   if(chunk._value) {
     get_course(chunk._value).then(find_schooltime).then(get_schooltime).then(function(obj) {
@@ -112,24 +112,22 @@ var reverse = through2.obj(function(chunk,enc,cb) {
             'present':-1,'absent':0,'total':-1});
         });
       });
-      console.log('115 callback');
       self.push(chunk);
       cb();
     }).catch(function(err) {
       console.log('re',chunk._rev,chunk.key,err);
       self.push(chunk);
-      console.log('120 callback');
       cb();
     })
   } else {
     self.push(chunk);
-    console.log('124 callback');
     cb();
   }
 });
+}
 
-var forward = through2.obj(function(chunk,enc,cb) {
-  console.log('forward',chunk);
+var forward = function() {
+  return through2.obj(function(chunk,enc,cb) {
   var self = this;
   if(chunk.value) {
     get_course(chunk.value).then(find_schooltime).then(get_schooltime).then(function(obj) {
@@ -154,7 +152,6 @@ var forward = through2.obj(function(chunk,enc,cb) {
      }).catch(function(err) {
         console.log('fl',chunk._rev,chunk.key,err);
         self.push(chunk);
-        console.log('154 callback');
         cb();
      })
   } else {
@@ -162,29 +159,31 @@ var forward = through2.obj(function(chunk,enc,cb) {
     cb();
   }
 });
+}
 
 module.exports = function(config) {
   return function(next) {
-    var myStream = through2.obj(function(chunk,enc,cb) {
-      console.log('+myStream');
-      this.push(chunk);
-      console.log('-myStream');
-      console.log('169 callback');
-      cb();
-    });
-
-    var endStream = through2.obj(function(chunk,enc,cb) {
-      // console.log(chunk);
-      if(chunk.student) {
-        console.log(chunk.student);
-      }
-      if(chunk._rev) {
-        console.log('end',chunk._rev);
+    var myStream = function() {
+      var stream = through2.obj(function(chunk,enc,cb) {
         this.push(chunk);
-        next();
-      }
-      cb();
-    });
+        cb();
+      });
+      return stream;
+    }
+
+    var endStream = function() {
+      return through2.obj(function(chunk,enc,cb) {
+        if(chunk.student) {
+          console.log(chunk.student);
+        }
+        if(chunk._rev) {
+          console.log('end',chunk._rev);
+          this.push(chunk);
+          next();
+        }
+        cb();
+      });
+    }
 
     return [myStream,reverse,forward,endStream];
   };

@@ -42,29 +42,25 @@ var _updateMirror = function(self,db,chunk,cb) {
 }
 
 var _request = function(config,_rev,next) {
-  var updateMirror = through2.obj(function(chunk,enc,cb) {
-    _updateMirror(this,config.mirrorDb,chunk,cb);
-  });
-
-  request.get({
+  var _rev = '1489443127144';
+  var stream = request.get({
     url:config.url,
     qs:{'gt':_rev,'limit':1},
     headers: {
      'authorization':'JWT '+config.jwtToken
     }
   }).pipe(JSONStream.parse('*'))
-  .pipe(updateMirror);
+  .pipe(through2.obj(function(chunk,enc,cb) {
+    _updateMirror(this,config.mirrorDb,chunk,cb);
+  }));
 
   var handlers = config.streamHandler(next);
-  console.log('handlers',handlers.length);
-  updateMirror.pipe(handlers[0]);
 
-  for(var i=0;i<handlers.length-1;i++) {
-    var next = handlers[i+1];
-    handlers[i].pipe(next);
+  for(var i=0;i<handlers.length;i++) {
+    stream = stream.pipe(handlers[i]());
   }
 
-  handlers[handlers.length-1].pipe(through2.obj(function(chunk,enc,cb) {
+  stream.pipe(through2.obj(function(chunk,enc,cb) {
     console.log('put',chunk._rev);
     config.configDb.put('_rev',{'ts':chunk._rev});
   }));
@@ -85,57 +81,3 @@ logview.monitor = function(req,res,next) {
   });
   
 }
-
-
-
-logview.initial = function(config) {
-
-  var get = function(db,key) {
-    return new Promise(function(fulfill,reject) {
-      db.get(key,function(err,obj) {
-        if(err) reject(err);
-        else fullfill(obj);
-      });
-    });
-  };
-
-  var update_config = function(chunk) {
-    return new Promise(function(fulfill,reject) {
-      configDb.put('_config',{'revision':chunk.key},function(err) {
-        if(!err) fulfill(chunk.key);
-      });
-    });
-  }
-
-  var jsonStream = through2.obj(function(chunk,encoding,cb) {
-    var self = this;
-    update_config(chunk);
-    db.get(chunk.value.key,function(err,obj) {
-      if(!err) { 
-        var value = diff.apply(chunk.value.changes,{});
-        var changes = diff(obj,value);
-       // if(changes.length!=0) {
-          self.push({
-            event:'update',
-            value:value,
-            rev:chunk.key,
-            key:chunk.value.key,
-            _value:obj
-          });
-       // }
-        cb();
-      } else {
-        var value = diff.apply(chunk.value.changes,{});
-        var obj = {'key':chunk.value.key,'value':value};
-        db.put(obj.key,obj.value,function(err) {
-          if(!err) {
-            self.push({event:'insert',value:value,rev:chunk.key,key:chunk.value.key});
-          }
-          cb();
-        });
-      }
-    });
-  });
-  return jsonStream;
-};
-

@@ -38,5 +38,6 @@ jspm_packages
 examples/config.js
 examples/test
 examples/view
+examples/myView
 examples/_view
 
