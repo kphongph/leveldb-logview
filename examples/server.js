@@ -44,7 +44,7 @@ var get_course = function(obj) {
 
 var find_schooltime = function(obj) {
   var attendance  = obj.attendance;
-
+  
   var get_level = function(attendance) {
     var _type = {'มัธยมศึกษาปีที่':9,'ประถมศึกษาปีที่':3};
     var _label = attendance['class'];
@@ -93,7 +93,6 @@ var get_schooltime = function(obj) {
 
 var reverse = through2.obj(function(chunk,enc,cb) {
   var self = this;
-  console.log(chunk);
   if(chunk._value) {
     get_course(chunk._value).then(find_schooltime).then(get_schooltime).then(function(obj) {
       var attendance = obj.attendance;
@@ -116,52 +115,67 @@ var reverse = through2.obj(function(chunk,enc,cb) {
             'present':-1,'absent':0,'total':-1});
         });
       });
-    })
-    .catch(function(err) {
-      console.log(err);
+      self.push({'chunk':chunk});
+      cb();
+    }).catch(function(err) {
+      console.log('re',chunk.rev,chunk.key,err);
+      self.push({'chunk':chunk});
       cb();
     })
+  } else {
+    self.push({'chunk':chunk});
+    cb();
   }
+});
 
-  get_course(chunk.value).then(find_schooltime).then(get_schooltime).then(function(obj) {
-    var attendance = obj.attendance;
-    var students = obj.students.map(function(_obj) {
-      return _obj.cid;
-    });
-    attendance.data.forEach(function(slot) {
-      var absentList = slot.student.map(function(_obj) {
+var follow = through2.obj(function(chunk,enc,cb) {
+  var self = this;
+  if(chunk.chunk) {
+    var chunk = chunk.chunk;
+    get_course(chunk.value).then(find_schooltime).then(get_schooltime).then(function(obj) {
+      var attendance = obj.attendance;
+      var students = obj.students.map(function(_obj) {
         return _obj.cid;
       });
-      var presentList = students.filter(function(cid) {
-        return absentList.indexOf(cid) < 0;
-      });
-      absentList.forEach(function(cid) {
-        self.push({'attendance':attendance,'student':cid,
-          'present':0,'absent':1,'total':1});
-      });
-      presentList.forEach(function(cid) {
-       self.push({'attendance':attendance,'student':cid,
-          'present':1,'absent':0,'total':1});
+      attendance.data.forEach(function(slot) {
+        var absentList = slot.student.map(function(_obj) {
+          return _obj.cid;
+        });
+        var presentList = students.filter(function(cid) {
+          return absentList.indexOf(cid) < 0;
+        });
+        absentList.forEach(function(cid) {
+          self.push({'attendance':attendance,'student':cid,
+            'present':0,'absent':1,'total':1});
+        });
+        presentList.forEach(function(cid) {
+          self.push({'attendance':attendance,'student':cid,
+            'present':1,'absent':0,'total':1});
+        });
       });
       cb();
-    });
-  })
-  .catch(function(err) {
-    console.log(err);
+     }).catch(function(err) {
+        console.log('fl',chunk.rev,chunk.key,err);
+        cb();
+     })
+  } else {
+    self.push(chunk);
     cb();
-  })
+  }
 });
 
 request.get({
   url:'https://maas.nuqlis.com:9000/api/log/attendance',
-  qs:{'start':'1490847563900','limit':1},
+  qs:{'start':'14','limit':100},
   headers: {
     'authorization':'JWT '+config.token
   }})
 .pipe(JSONStream.parse('*'))
 .pipe(stream)
 .pipe(reverse)
+.pipe(follow)
 .pipe(through2.obj(function(chunk,enc,cb) {
+  // console.log(chunk);
   var self = this;
   var attendance = chunk.attendance;
   var key = [attendance.hostid,attendance.year,chunk.student];
