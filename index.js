@@ -4,6 +4,7 @@ var sublevel = require('level-sublevel');
 var path = require('path');
 var diff = require('changeset');
 var request = require('request');
+var bytewise = require('bytewise');
 var JSONStream = require('JSONStream');
 
 var logview = exports;
@@ -84,14 +85,36 @@ logview.monitor = function(req,res,next) {
   });
 }
 
+var getOpts = function(opts) {
+  if(opts.limit) opts.limit = Number(opts.limit);
+  if(opts.start) opts.start = bytewise.encode(opts.start,'hex');
+  if(opts.end) opts.end = bytewise.encode(opts.end,'hex');
+  return opts;
+}
+
 logview.serve = function(req,res,next) {
-  console.log('serve');
-  var db = logview.config.mainDb;
-  res.setHeader('content-type','application/json');
-  //res.end(JSON.stringify({'a':1}));
-  //console.log(db);
-  db.createReadStream()
-  .pipe(JSONStream.stringify())
-  .pipe(res);
-  //res.end(JSON.stringify({'a':1}));
+  if(req.method == "POST") {
+    console.log('serve');
+    var db = logview.config.mainDb;
+    res.setHeader('content-type','application/json');
+    db.createReadStream(getOpts(req.body))
+    .pipe(through2.obj(function(chunk,enc,cb) {
+      this.push({
+        'key':bytewise.decode(chunk.key,'hex'),
+        'value':chunk.value
+      });
+      cb();
+    }))
+    .pipe(JSONStream.stringify())
+    .pipe(res);
+  } else {
+    res.setHeader('content-type','application/json');
+    logview.config.configDb.get('_rev',function(err,value) {
+      if(!err) {
+        res.end(JSON.stringify(value));
+      } else {
+        res.end(JSON.stringify({'ts':0}));
+      }
+    });
+  }
 };

@@ -3,7 +3,10 @@ var through2 = require('through2');
 var config = require('./config');
 var logview = require('..');
 var http = require('http');
+var bodyParser = require('body-parser');
 var app = connect();
+app.use(bodyParser.json());
+
 var myStream = require('./myStream');
 
 var streamHandler = myStream.createStreamHandlers(config);

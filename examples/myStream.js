@@ -187,7 +187,8 @@ module.exports.createStreamHandlers = function(config) {
           var obj = {key:key,value:change};
           viewdb.get(bytewise.encode(obj.key),function(err,_obj) { 
             if(err) {
-              viewdb.put(bytewise.encode(obj.key),obj.value,function(err) { 
+              viewdb.put(bytewise.encode(obj.key,'hex'),
+                obj.value,function(err) { 
                 cb();
               });
             } else {
@@ -195,7 +196,7 @@ module.exports.createStreamHandlers = function(config) {
               _obj.absent+=obj.value.absent;
               _obj.total+=obj.value.total;
               //console.log(obj.key,_obj);
-              viewdb.put(bytewise.encode(obj.key),_obj,function(err) {
+              viewdb.put(bytewise.encode(obj.key,'hex'),_obj,function(err) {
                 cb();
               });
             }
