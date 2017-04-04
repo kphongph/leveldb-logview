@@ -6,8 +6,11 @@ var diff = require('changeset');
 var request = require('request');
 var bytewise = require('bytewise');
 var JSONStream = require('JSONStream');
+var locks = require('locks');
 
 var logview = exports;
+
+var mutex = locks.createMutex();
 
 logview.config = function(config) {
   logview.config = config;
@@ -42,7 +45,7 @@ var _updateMirror = function(self,db,chunk,cb) {
   });
 }
 
-var _request = function(config,_rev,next) {
+var _request = function(config,_rev,callback) {
   var stream = request.get({
     url:config.url,
     qs:{'gt':_rev,'limit':100},
@@ -54,19 +57,19 @@ var _request = function(config,_rev,next) {
     _updateMirror(this,config.mirrorDb,chunk,cb);
   }));
 
-  var handlers = config.streamHandler(next);
+  var handlers = config.streamHandler();
 
   for(var i=0;i<handlers.length;i++) {
     stream = stream.pipe(handlers[i]());
   }
 
   stream.pipe(through2.obj(function(chunk,enc,cb) {
-    console.log('put',chunk._rev);
+   // console.log('put',chunk._rev);
     config.configDb.put('_rev',{'ts':chunk._rev});
     cb();
   })).on('finish',function() {
-    console.log('finish');
-    next();
+   // console.log('finish');
+    callback();
   });
 };
 
@@ -74,15 +77,23 @@ logview.monitor = function(req,res,next) {
   // get current rev
   var config = logview.config;
   var configDb = config.configDb;
-  configDb.get('_rev',function(err,value) {
-    if(err) {
-      configDb.put('_rev',{'ts':0},function(err) {
-        _request(config,0,next);
-      });
-    } else {
-      _request(config,value.ts,next);
-    }
+  mutex.lock(function() {
+    console.log('process');
+    configDb.get('_rev',function(err,value) {
+      if(err) {
+        configDb.put('_rev',{'ts':0},function(err) {
+          _request(config,0,function() {
+            mutex.unlock();
+          });
+        });
+      } else {
+        _request(config,value.ts,function() {
+          mutex.unlock();
+        });
+      }
+    });
   });
+  next();
 }
 
 var getOpts = function(opts) {
@@ -94,7 +105,6 @@ var getOpts = function(opts) {
 
 logview.serve = function(req,res,next) {
   if(req.method == "POST") {
-    console.log('serve');
     var db = logview.config.mainDb;
     res.setHeader('content-type','application/json');
     db.createReadStream(getOpts(req.body))

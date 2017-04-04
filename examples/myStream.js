@@ -164,7 +164,7 @@ var forward = function() {
 }
 
 module.exports.createStreamHandlers = function(config) {
-  return function(next) {
+  return function() {
     var myStream = function() {
       var stream = through2.obj(function(chunk,enc,cb) {
         this.push(chunk);
@@ -205,7 +205,6 @@ module.exports.createStreamHandlers = function(config) {
           console.log(chunk._rev);
           this.push(chunk);
           cb();
-         // next();
         }
       });
     }
