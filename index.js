@@ -10,6 +10,8 @@ var locks = require('locks');
 
 var logview = exports;
 
+var _revSize = 100;
+
 var mutex = locks.createMutex();
 
 logview.config = function(config) {
@@ -23,32 +25,27 @@ logview.config = function(config) {
 var _updateMirror = function(self,db,chunk,cb) {
   var value = diff.apply(chunk.value.changes,{});
   db.get(chunk.value.key,function(err,obj) { 
+    var _pushObj = { 
+      value:value,
+      _rev:chunk.key,
+      key:chunk.value.key
+    };
     if(!err) { 
-      var changes = diff(obj,value);
-      self.push({value:value,
-        _rev:chunk.key,
-        key:chunk.value.key,
-        _value:obj
-      });
-      cb();
-    } else {
-      var obj = {'key':chunk.value.key,'value':value};
-      db.put(obj.key,obj.value,function(err) {
-        if(!err) {
-          self.push({value:value,
-           _rev:chunk.key,
-           key:chunk.value.key});
-        }
-        cb();
-      });
+      _pushObj['_value'] = obj;
     }
+    db.put(_pushObj.key,_pushObj.value,function(err) {
+      if(!err) {
+        self.push(_pushObj);
+      }
+      cb();
+    });
   });
 }
 
 var _request = function(config,_rev,callback) {
   var stream = request.get({
     url:config.url,
-    qs:{'gt':_rev,'limit':100},
+    qs:{'gt':_rev,'limit':_revSize},
     headers: {
      'authorization':'JWT '+config.jwtToken
     }
@@ -81,10 +78,8 @@ logview.monitor = function(req,res,next) {
     console.log('process');
     configDb.get('_rev',function(err,value) {
       if(err) {
-        configDb.put('_rev',{'ts':0},function(err) {
-          _request(config,0,function() {
-            mutex.unlock();
-          });
+        _request(config,'0',function() {
+          mutex.unlock();
         });
       } else {
         _request(config,value.ts,function() {
@@ -93,6 +88,7 @@ logview.monitor = function(req,res,next) {
       }
     });
   });
+  console.log('next');
   next();
 }
 

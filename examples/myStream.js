@@ -20,25 +20,29 @@ var get_course = function(obj) {
   //console.log('get_course');
   var attendance  = obj;
   return new Promise(function(fullfill,reject) {
-    var key = bytewise.encode([
-       attendance.hostid,
-       attendance.year,
-       attendance.staffid]);
-    teachdb.get(key,function(err,value) {
-      if(err) {
-        request({
-          method:'GET',
-          url:azureConfig.domain+'/ServiceControl/GetEduService.svc/getCourseFromStaff',
-          qs:{'hostID':attendance.hostid,'staffID':attendance.staffid,'year':attendance.year}
-        },function(err,response,body) {
-          var _obj = JSON.parse(body);
-          teachdb.put(key,_obj);
-          fullfill({'attendance':obj,'courses':_obj});
-        });
-      } else {
-        fullfill({'attendance':obj,'courses':value});
-      }
-    });
+    if(attendance.hostid && attendance.year && attendance.staffid) {
+      var key = bytewise.encode([
+         attendance.hostid,
+         attendance.year,
+         attendance.staffid]);
+      teachdb.get(key,function(err,value) {
+        if(err) {
+          request({
+            method:'GET',
+            url:azureConfig.domain+'/ServiceControl/GetEduService.svc/getCourseFromStaff',
+            qs:{'hostID':attendance.hostid,'staffID':attendance.staffid,'year':attendance.year}
+          },function(err,response,body) {
+            var _obj = JSON.parse(body);
+            teachdb.put(key,_obj);
+            fullfill({'attendance':obj,'courses':_obj});
+          });
+        } else {
+          fullfill({'attendance':obj,'courses':value});
+        }
+      });
+    } else {
+      reject('Delete log',attendance); 
+    }
   });
 };
 
@@ -93,7 +97,6 @@ var get_schooltime = function(obj) {
   });
 }
 
-
 var reverse = function() {
   return through2.obj(function(chunk,enc,cb) {
   var self = this;
@@ -140,11 +143,11 @@ var forward = function() {
       attendance.data.forEach(function(slot) {
         var absentList = _.map(slot.student,'cid');
         var presentList = _.difference(students,absentList);
-        absentList.forEach(function(cid) {
+        _.forEach(absentList,function(cid) {
           self.push({'attendance':attendance,'student':cid,
             'present':0,'absent':1,'total':1});
         });
-        presentList.forEach(function(cid) {
+        _.forEach(presentList,function(cid) {
           self.push({'attendance':attendance,'student':cid,
             'present':1,'absent':0,'total':1});
         });
@@ -184,25 +187,29 @@ module.exports.createStreamHandlers = function(config) {
             chunk.student];
           var change = {'present':chunk.present,
             'absent':chunk.absent,'total':chunk.total};
-          var obj = {key:key,value:change};
-          viewdb.get(bytewise.encode(obj.key),function(err,_obj) { 
+          var obj = {key:bytewise.encode(key,'hex'),value:change};
+          //console.log(change);
+          
+          viewdb.get(obj.key,function(err,_obj) { 
             if(err) {
-              viewdb.put(bytewise.encode(obj.key,'hex'),
-                obj.value,function(err) { 
+              viewdb.put(obj.key,obj.value,function(err) { 
                 cb();
               });
             } else {
+              //console.log('>',_obj);
+              //console.log('>',obj.value);
               _obj.present+=obj.value.present;
               _obj.absent+=obj.value.absent;
               _obj.total+=obj.value.total;
-              //console.log(obj.key,_obj);
-              viewdb.put(bytewise.encode(obj.key,'hex'),_obj,function(err) {
+              //console.log('>>',_obj);
+              viewdb.put(obj.key,_obj,function(err) {
                 cb();
               });
             }
           });
         } else {
-          console.log(chunk._rev);
+          //console.log(JSON.stringify(chunk,null,2));
+          //console.log(chunk._rev);
           this.push(chunk);
           cb();
         }
