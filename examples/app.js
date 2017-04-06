@@ -5,7 +5,6 @@ var logview = require('..');
 var http = require('http');
 var bodyParser = require('body-parser');
 var app = connect();
-app.use(bodyParser.json());
 
 var myStream = require('./myStream');
 
@@ -18,6 +17,8 @@ logview.config({
   'streamHandler': streamHandler,
 });
 
+app.use(bodyParser.json());
+app.use(logview.handle_match);
 app.use(logview.monitor);
 app.use(logview.serve);
 
