@@ -99,9 +99,20 @@ var getOpts = function(opts) {
   return opts;
 }
 
+logview.handle_match = function(req,res,next) {
+  if(req.body.match) {
+     req.body['start'] = req.body.match;
+     req.body['end'] = req.body.match.slice();
+     req.body['end'].push(undefined);
+     delete req.body['match'];
+  }
+  next();
+}
+
 logview.serve = function(req,res,next) {
   if(req.method == "POST") {
     var db = logview.config.mainDb;
+    console.log(req.body);
     res.setHeader('content-type','application/json');
     db.createReadStream(getOpts(req.body))
     .pipe(through2.obj(function(chunk,enc,cb) {
