@@ -1,5 +1,5 @@
 var through2 = require('through2');
-var levelup = require('levelup');
+var levelup = require('level');
 var sublevel = require('level-sublevel');
 var path = require('path');
 var diff = require('changeset');

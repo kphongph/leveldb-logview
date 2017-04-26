@@ -1,6 +1,6 @@
 var through2 = require('through2');
 var sublevel = require('level-sublevel');
-var levelup = require('levelup');
+var levelup = require('level');
 var bytewise = require('bytewise');
 var request = require('request');
 var _ = require('lodash');
